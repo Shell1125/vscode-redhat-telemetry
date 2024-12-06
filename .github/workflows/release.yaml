@@ -1,6 +1,6 @@
 name: Release to NPM
 
-# Controls when the action will run. Triggers the workflow on pushed tags 
+# Controls when the action will run. Triggers the workflow on pushed tags
 on:
   push:
     tags:
@@ -18,13 +18,13 @@ jobs:
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
       # Set up Node
-    - name: Use Node 16
-      uses: actions/setup-node@v3
+    - name: Use Node 20
+      uses: actions/setup-node@v4
       with:
-        node-version: 16
+        node-version: 20
         registry-url: 'https://registry.npmjs.org'
 
       # Run install dependencies

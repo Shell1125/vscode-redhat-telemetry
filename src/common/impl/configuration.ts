@@ -2,11 +2,11 @@ import * as picomatch from "picomatch";
 import { isError } from "../utils/events";
 import { numValue } from "../utils/hashcode";
 import { AnalyticsEvent } from "../api/analyticsEvent";
-import { Logger } from "../utils/logger";
 
 interface EventNamePattern {
     name: string;
     ratio?: string;
+    dailyLimit?: string;
 }
 
 interface PropertyPattern {
@@ -36,16 +36,31 @@ export class Configuration {
             return false;
         }
 
-
         const currUserRatioValue = numValue(event.userId);
         const configuredRatio = getRatio(this.json?.ratio);
-        if (configuredRatio < currUserRatioValue) {
+        if (configuredRatio === 0 || configuredRatio < currUserRatioValue) {
             return false;
         }
 
-        const isIncluded = this.isIncluded(event, currUserRatioValue) && !this.isExcluded(event, currUserRatioValue);
-        
+        const isIncluded = this.isIncluded(event, currUserRatioValue)
+                        && !this.isExcluded(event, currUserRatioValue)
         return isIncluded;
+    }
+
+    public getDailyLimit(event: AnalyticsEvent): number {
+        const includes = this.getIncludePatterns();
+        if (includes.length) {
+            const pattern = includes.filter(isEventNamePattern).map(p => p as EventNamePattern)
+            .find(p => picomatch.isMatch(event.event, p.name))
+            if (pattern?.dailyLimit) {
+                try {
+                    return parseInt(pattern.dailyLimit);
+                } catch(e) {
+                    // ignore
+                }
+            }
+        }
+        return Number.MAX_VALUE;
     }
 
     isIncluded(event: AnalyticsEvent, currUserRatioValue: number): boolean {
@@ -72,12 +87,12 @@ export class Configuration {
     }
 
     getExcludePatterns(): EventPattern[] {
-        if (this.json.excludes) {
+        if (this.json?.excludes) {
             return this.json.excludes as EventPattern[];
         }
         return [];
     }
-    
+
     isEventMatching(event: AnalyticsEvent, patterns:EventPattern[], currUserRatioValue: number, including: boolean):boolean {
         if (!patterns || !patterns.length) {
             return false;
@@ -98,7 +113,7 @@ export class Configuration {
                     const configuredEventRatio = getRatio(evtPtn?.ratio);
                     if (including) {
                         return currUserRatioValue <= configuredEventRatio;
-                    } 
+                    }
                     // excluding 90% of user means keeping 10%
                     // so user ratio value of 0.11 should be excluded (i.e match) when excluded event ratio = 0.9
                     return currUserRatioValue > 1 - configuredEventRatio;
@@ -121,10 +136,15 @@ function getRatio(ratioAsString ?:string): number {
     return 1.0;
 }
 
-
-
 function isPropertyPattern(event: EventPattern): event is PropertyPattern {
     if ((event as PropertyPattern).property) {
+        return true
+    }
+    return false
+}
+
+function isEventNamePattern(event: EventPattern): event is EventNamePattern {
+    if ((event as EventNamePattern).name) {
         return true
     }
     return false
